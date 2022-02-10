@@ -1,5 +1,5 @@
 # zone identifiers when copying from windows to WSL file structure
-*.Zone.Identifier
+*.Zone:Identifier
 
 # huge data files
 EIR_sample_data
