@@ -82,7 +82,7 @@ batch_size = 64
 
 
 # %%
-model = GLN(in_features=100, num_classes=1,num_residual_blocks=2)
+model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=device)
 
 # %%
 criterion = nn.L1Loss()
