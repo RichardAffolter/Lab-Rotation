@@ -94,7 +94,6 @@ train_loader = DataLoader(dataset=train_dataset, batch_size=5, shuffle=True, dro
 learning_rate = 1e-3
 batch_size = 32
 load_model = True
-num_epochs = 1
 
 # %%
 model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=device)
@@ -108,11 +107,11 @@ optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 if load_model:
     load_checkpoint(torch.load("my_checkpoint.pth.tar"))
 # %%
-for epoch in range(num_epochs):
+for epoch in range(1):
     losses = []
     t0 = time.time()
-    loop = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
-    for batch_idx, (data,targets) in loop:
+
+    for batch_idx, (data,targets) in enumerate(tqdm(train_loader)):
         data = F.one_hot(data.long(), num_classes=4)
         data = data.transpose(-1,-2)
         data = data.to(device=device)
@@ -129,10 +128,6 @@ for epoch in range(num_epochs):
 
         # gradient descent
         optimizer.step()
-
-        # update progress bar
-        loop.set_description(f"Epoch [{epoch}/{num_epochs}]")
-        loop.set_postfix(loss = loss.item())
     
     mean_loss = sum(losses)/len(losses)
     elapsed_time = (time.time() - t0)/60
