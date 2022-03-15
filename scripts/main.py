@@ -9,20 +9,15 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import h5py
-
+import time
 import torch.optim as optim
-
+from tqdm import tqdm
 #from sklearn.preprocessing import LabelEncoder
+#from torchinfo import summary
 
-from torchinfo import summary
-
-
-# %%
 from gln_model import *
-# %%
-# set device
+# %% set device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 # %%
 def check_accuracy(loader, model):
     num_correct = 0
@@ -72,28 +67,52 @@ class SNPDataset(Dataset):
         return self.X.shape
 
 # %%
-train_dataset = SNPDataset(data_path='/links/groups/borgwardt/Projects/UKBiobank/height_prediction_2021/data/Xy_toy_train.hdf5')
+def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
+    print("=> Saving checkpoint")
+    torch.save(state, filename)
+
+def load_checkpoint(checkpoint):
+    print("=> Loading checkpoint")
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+
+
+
+
+
+
+
+#%%
+#path_name = "/links/groups/borgwardt/Projects/UKBiobank/height_prediction_2021/data/Xy_toy_train.hdf5"
+path_name = "/home/richard/labrotation/data/Xy_toy_train.hdf5"
+# %%
+train_dataset = SNPDataset(data_path=path_name)
 train_loader = DataLoader(dataset=train_dataset, batch_size=5, shuffle=True, drop_last=True)
 
 # %%
 # Hyperparameters
 learning_rate = 1e-3
-batch_size = 64
-
+batch_size = 32
+load_model = True
+num_epochs = 1
 
 # %%
 model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=device)
 
+#model.load_state_dict(torch.load('my_model3'))
 # %%
 criterion = nn.L1Loss()
 optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 
-
 # %%
-for epoch in range(10):
+if load_model:
+    load_checkpoint(torch.load("my_checkpoint.pth.tar"))
+# %%
+for epoch in range(num_epochs):
     losses = []
-
-    for batch_idx, (data,targets) in enumerate(train_loader):
+    t0 = time.time()
+    loop = tqdm(enumerate(train_loader), total=len(train_loader), leave=False)
+    for batch_idx, (data,targets) in loop:
         data = F.one_hot(data.long(), num_classes=4)
         data = data.transpose(-1,-2)
         data = data.to(device=device)
@@ -110,22 +129,18 @@ for epoch in range(10):
 
         # gradient descent
         optimizer.step()
+
+        # update progress bar
+        loop.set_description(f"Epoch [{epoch}/{num_epochs}]")
+        loop.set_postfix(loss = loss.item())
     
     mean_loss = sum(losses)/len(losses)
-    
-    if epoch % 5 ==0:
+    elapsed_time = (time.time() - t0)/60
+    if epoch % 1 ==0:
         print(f'loss at epoch {epoch} was {mean_loss:.5f}')
-        
+        print(f'epoch took {elapsed_time:.1f} minutes')
+        checkpoint = {'state_dict' : model.state_dict(), 'optimizer' : optimizer.state_dict()}
+        save_checkpoint(checkpoint)
 
-
-# %%
-torch.save(model.state_dict(), 'my_model')
-
-# %%
-
-
-
-# %%
-print(summary(model))
 
 
