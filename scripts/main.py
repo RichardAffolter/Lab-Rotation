@@ -3,15 +3,17 @@ import os
 import math
 import pandas as pd
 import numpy as np
+import h5py
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import h5py
-import time
 import torch.optim as optim
+import torch.profiler
 from tqdm import tqdm
+
 #from sklearn.preprocessing import LabelEncoder
 #from torchinfo import summary
 
@@ -93,7 +95,7 @@ train_loader = DataLoader(dataset=train_dataset, batch_size=5, shuffle=True, dro
 # Hyperparameters
 learning_rate = 1e-3
 batch_size = 32
-load_model = True
+load_model = False
 
 # %%
 model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=device)
@@ -103,15 +105,17 @@ model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=devi
 criterion = nn.L1Loss()
 optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 
+#%%
+
 # %%
 if load_model:
     load_checkpoint(torch.load("my_checkpoint.pth.tar"))
 # %%
-for epoch in range(1):
+for epoch in range(0):
     losses = []
     t0 = time.time()
 
-    for batch_idx, (data,targets) in enumerate(tqdm(train_loader)):
+    for batch_idx, (data,targets) in enumerate(train_loader):
         data = F.one_hot(data.long(), num_classes=4)
         data = data.transpose(-1,-2)
         data = data.to(device=device)
@@ -139,3 +143,35 @@ for epoch in range(1):
 
 
 
+#%% profiler
+def train(data,targets):
+    data = F.one_hot(data.long(), num_classes=4)
+    data = data.transpose(-1,-2)
+    data = data.to(device=device)
+    targets = targets.flatten().to(device=device)
+
+    # forwards
+    scores = model(data).flatten()
+    loss = criterion(scores, targets)
+
+    # backwards
+    optimizer.zero_grad()
+    loss.backward()
+
+    # gradient descent
+    optimizer.step()
+
+#%%
+with torch.profiler.profile(
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/toy'),
+        record_shapes=False,
+        profile_memory=True,
+        with_stack=True
+) as prof:
+    for step, (data,targets) in enumerate(train_loader):
+        if step >= (1 + 1 + 3) * 2:
+            break
+        train(data,targets)
+        prof.step()  # Need to call this at the end of each step to notify profiler of steps' boundary.
+# %%
