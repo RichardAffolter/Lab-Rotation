@@ -20,7 +20,7 @@ from tqdm import tqdm
 from gln_model import *
 # %% set device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# %%
+# %% Accuracy function for categorical targets
 def check_accuracy(loader, model):
     num_correct = 0
     num_samples = 0
@@ -42,9 +42,30 @@ def check_accuracy(loader, model):
     model.train()
     return(num_correct,num_samples)
 
+#%% mean absolute error for continuous targets
+def get_MAE(loader, model):
+    running_MAE = 0.0
+    running_MSE = 0.0
+    num_samples = 0
+    model.eval()
+    with torch.no_grad():
+        for x,y in loader:
+            x = x.to(device=device)
+            y = y.to(device=device)
+            scores = model(x)
+            error = torch.abs(scores - y)
+            squared_error = torch.square(error)
+            
+            runnning_mae += error
+            runnning_mse += squared_error
+            num_samples += scores.shape[0]
+        
+        MAE = running_MAE/num_samples
+        MSE = running_MSE(num_samples)
+        print(f' Got MAE: {MAE} and MSE: {MSE}')
 
-
-
+    model.train()
+    return(MAE,MSE)
 # %%
 class SNPDataset(Dataset):
     def __init__(self, data_path, transform=None):
@@ -79,39 +100,33 @@ def load_checkpoint(checkpoint):
     optimizer.load_state_dict(checkpoint['optimizer'])
 
 
-
-
-
-
-
-#%%
+# %%
+# Hyperparameters
+learning_rate = 1e-1
+batch_size = 32
+load_model = False
 #path_name = "/links/groups/borgwardt/Projects/UKBiobank/height_prediction_2021/data/Xy_toy_train.hdf5"
 path_name = "/home/richard/labrotation/data/Xy_toy_train.hdf5"
 # %%
 train_dataset = SNPDataset(data_path=path_name)
-train_loader = DataLoader(dataset=train_dataset, batch_size=5, shuffle=True, drop_last=True)
+train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
+
+
 
 # %%
-# Hyperparameters
-learning_rate = 1e-3
-batch_size = 32
-load_model = False
-
-# %%
-model = GLN(in_features=100, num_classes=1,num_residual_blocks=2).to(device=device)
+model = GLN(in_features=train_dataset.dims()[1], num_classes=1,num_residual_blocks=2).to(device=device)
 
 #model.load_state_dict(torch.load('my_model3'))
 # %%
-criterion = nn.L1Loss()
+criterion = nn.L1Loss().cuda() if torch.cuda.is_available() else nn.L1Loss()
 optimizer = optim.Adam(model.parameters(),lr=learning_rate)
-
-#%%
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.2 ,patience=2, verbose=True)
 
 # %%
 if load_model:
     load_checkpoint(torch.load("my_checkpoint.pth.tar"))
 # %%
-for epoch in range(0):
+for epoch in range(1):
     losses = []
     t0 = time.time()
 
@@ -134,6 +149,7 @@ for epoch in range(0):
         optimizer.step()
     
     mean_loss = sum(losses)/len(losses)
+    scheduler.step(mean_loss)
     elapsed_time = (time.time() - t0)/60
     if epoch % 1 ==0:
         print(f'loss at epoch {epoch} was {mean_loss:.5f}')
@@ -162,16 +178,22 @@ def train(data,targets):
     optimizer.step()
 
 #%%
-with torch.profiler.profile(
-        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/toy'),
-        record_shapes=False,
-        profile_memory=True,
-        with_stack=True
-) as prof:
-    for step, (data,targets) in enumerate(train_loader):
-        if step >= (1 + 1 + 3) * 2:
-            break
-        train(data,targets)
-        prof.step()  # Need to call this at the end of each step to notify profiler of steps' boundary.
+if False:
+        
+    with torch.profiler.profile(
+            schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/toy'),
+            record_shapes=False,
+            profile_memory=True,
+            with_stack=True
+    ) as prof:
+        for step, (data,targets) in enumerate(train_loader):
+            if step >= (1 + 1 + 3) * 2:
+                break
+            train(data,targets)
+            prof.step()  # Need to call this at the end of each step to notify profiler of steps' boundary.
+    # %%
+
+from torchinfo import summary
 # %%
+summary(model)
