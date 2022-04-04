@@ -102,7 +102,7 @@ class FCBlock(nn.Module):
         return x
  # %%
 class GLN(nn.Module):
-    def __init__(self, in_features, num_classes, num_residual_blocks=2, m1=2, m2=2, C=4, num_predictor_blocks=4):
+    def __init__(self, in_features, num_classes, num_residual_blocks=2, m1=2, m2=2, C=4, num_predictor_blocks=4, p=0.2):
         super().__init__()
         self.m1 = m1
         self.m2 = m2
@@ -115,7 +115,7 @@ class GLN(nn.Module):
         self.FCLayers = self.make_predictorLayers(in_features=Output2)
         self.bn = nn.BatchNorm1d(256)
         self.silu = nn.SiLU()
-        self.drop = nn.Dropout(p=0.5)
+        self.drop = nn.Dropout(p=p)
         self.Linear = nn.Linear(256,num_classes)
         
 
@@ -135,6 +135,8 @@ class GLN(nn.Module):
 
     
     def forward(self,x):
+        x = F.one_hot(x.long(), num_classes=4)
+        x = x.transpose(-1,-2)
         x = self.LCL0(x)
         x = self.LCLayers(x)
         x = x.flatten(1)
