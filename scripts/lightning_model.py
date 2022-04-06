@@ -17,9 +17,8 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 
 from pytorch_lightning.loggers import WandbLogger
-
-#from sklearn.preprocessing import LabelEncoder
-#from torchinfo import summary
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from gln_model import *
 
@@ -27,9 +26,9 @@ from gln_model import *
 class SNPDataset(Dataset):
     def __init__(self, data_path):
         self.hf = h5py.File(data_path, 'r')
-        self.X = self.hf['X/SNP']
-        self.Age = self.hf['X/Age']
-        self.Sex = self.hf['X/Sex']
+        self.X   =  self.hf['X/SNP']
+        self.Age =  self.hf['X/Age']
+        self.Sex =  self.hf['X/Sex']
         self.y = self.hf['y/Height']
         
     def __len__(self):
@@ -109,13 +108,18 @@ val_loader   = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=
 test_loader  = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False, drop_last=False, num_workers=4)
 # %%
 #if __name__ == '__main__':
-pl.seed_everything(42, workers=True)
-trainer = pl.Trainer(fast_dev_run=False, 
+#pl.seed_everything(42, workers=True)
+early_stopping_callback = EarlyStopping(monitor='val_MAE',mode='min',min_delta=0.1,patience=2)
+
+trainer = pl.Trainer(fast_dev_run=True, 
                     max_epochs=1, 
-                    check_val_every_n_epoch=1)
+                    check_val_every_n_epoch=1,
+                    logger=WandbLogger)
 model = lightning_gln(in_features=train_dataset.dims()[1], num_classes=1,num_residual_blocks=2)
 
 trainer.fit(model, train_dataloaders=train_loader,val_dataloaders=val_loader)
+#print(checkpoint_callback.best_model_score.cpu())
+#model = model.load_from_checkpoint(checkpoint_path=checkpoint_callback.best_model_path)
 results = trainer.test(dataloaders=test_loader) #results dict
 
 #%%
