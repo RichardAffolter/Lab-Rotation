@@ -4,4 +4,6 @@ This repository contains the code which I used for my lab rotation for the Borgw
 ## Brief file description
 *integrate_environment.py*: code used to create the dataloaders. It adds the environmental data and the SNP data
 
-*gln.py*
+*gln_model.py* : my implementation of the global-linear-model from Sigurdsson et al.
+
+
