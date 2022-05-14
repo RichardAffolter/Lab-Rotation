@@ -122,14 +122,14 @@ class GLN(nn.Module):
         self.Linear = nn.Linear(256,num_classes)
         
 
-    def make_LCLayers(self, in_features):
+    def make_LCLayers(self, in_features, p=0.0):
         layers = []
         for block in range(self.num_residual_blocks):
             layers.append(LCBlock(in_features=in_features, m=self.m2))
             in_features = math.ceil(in_features/self.m2**2)
         return nn.Sequential(*layers)
 
-    def make_predictorLayers(self, in_features):
+    def make_predictorLayers(self, in_features, p=0.0):
         layers = []
         layers.append(FCBlock(in_features=in_features, out_features=256))
         for block in range(self.num_predictor_blocks):
