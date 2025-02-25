@@ -1,5 +1,7 @@
 # Lab-Rotation
 This repository contains the code which I used for my lab rotation for the Borgwardt group.
+The goal of the project was to integrate information about the genome and the environment to better predict human height as a model phenotype.
+This was done using data from the [UKBiobank Study](https://pubmed.ncbi.nlm.nih.gov/25826379/)
 
 ## Brief file description
 *integrate_environment.py*: code used to create the dataloaders. It adds the environmental data and the SNP data
